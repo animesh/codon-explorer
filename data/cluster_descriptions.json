@@ -1,0 +1,124 @@
+{
+  "clusters": {
+    "6": {
+      "sampled_size": 2000,
+      "top_descriptions": [
+        {
+          "primary": "Regulation of biological quality",
+          "secondary": "Vesicle",
+          "tertiary": "Ion binding"
+        }
+      ]
+    },
+    "0": {
+      "sampled_size": 2000,
+      "top_descriptions": [
+        {
+          "primary": "Alternative splicing",
+          "secondary": "-",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "5": {
+      "sampled_size": 2000,
+      "top_descriptions": [
+        {
+          "primary": "Primary metabolism",
+          "secondary": "Catalytic activity",
+          "tertiary": "Alternative splicing"
+        }
+      ]
+    },
+    "4": {
+      "sampled_size": 2000,
+      "top_descriptions": [
+        {
+          "primary": "Cellular component organization or biogenesis",
+          "secondary": "Cytosol",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "2": {
+      "sampled_size": 1680,
+      "top_descriptions": [
+        {
+          "primary": "Transmembrane signaling receptor activity",
+          "secondary": "Receptor",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "8": {
+      "sampled_size": 2000,
+      "top_descriptions": [
+        {
+          "primary": "Cellular metabolism",
+          "secondary": "Glycoprotein",
+          "tertiary": "Integral component of membrane"
+        }
+      ]
+    },
+    "7": {
+      "sampled_size": 1356,
+      "top_descriptions": [
+        {
+          "primary": "Regulation of transcription by RNA polymerase II",
+          "secondary": "Transcription regulator activity",
+          "tertiary": "DNA-binding"
+        }
+      ]
+    },
+    "10": {
+      "sampled_size": 1810,
+      "top_descriptions": [
+        {
+          "primary": "Coiled coil",
+          "secondary": "-",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "1": {
+      "sampled_size": 1929,
+      "top_descriptions": [
+        {
+          "primary": "Regulation of RNA metabolism",
+          "secondary": "Nucleus",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "11": {
+      "sampled_size": 424,
+      "top_descriptions": [
+        {
+          "primary": "Krueppel associated box",
+          "secondary": "-",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "3": {
+      "sampled_size": 217,
+      "top_descriptions": [
+        {
+          "primary": "RNA-binding",
+          "secondary": "-",
+          "tertiary": "-"
+        }
+      ]
+    },
+    "9": {
+      "sampled_size": 124,
+      "top_descriptions": [
+        {
+          "primary": "Keratinization",
+          "secondary": "-",
+          "tertiary": "-"
+        }
+      ]
+    }
+  }
+}

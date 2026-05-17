@@ -39,6 +39,8 @@ The `docs/` directory is generated automatically by GitHub Actions – **do not 
 ```bash
 cp /path/to/CCDS_nucleotide_20221027_fna_CCDS_20221027_txt_aa.txt \
    data/CCDS_codon_usage.tsv
+cp /path/to/CCDS_nucleotide_20221027_fna_CCDS_20221027_txt_aa.fasta \
+   data/CCDS_codon_usage.fasta   
 ```
 
 > **Note:** The file is ~16 MB – well within GitHub's 100 MB limit... if it ever gets larger
@@ -68,10 +70,13 @@ Re-push to trigger a rebuild.
 
 ```bash
 # Install deps
-pip install pandas numpy scikit-learn scipy
+pip install pandas numpy scikit-learn scipy requests
 
 # Generate data
 python scripts/process.py
+
+# Find enrichment per cluster
+python scripts/enrich.py
 
 # Serve locally (Python built-in server)
 cd docs

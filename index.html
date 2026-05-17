@@ -1,338 +1,419 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CCDS Codon Usage Explorer</title>
-
-<!-- Bootstrap 5 -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<!-- DataTables -->
 <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-<!-- Plotly -->
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
 <style>
-/* ── Design tokens ──────────────────────────────────────────────── */
-:root{
-  --bg:       #0d1117;
-  --surf:     #161b22;
-  --surf2:    #21262d;
-  --border:   #30363d;
-  --text:     #e6edf3;
-  --muted:    #8b949e;
-  --accent:   #58a6ff;
-  --accent2:  #3fb950;
-  --danger:   #f85149;
+/* ── Paul Tol "bright" 12-colour CB-safe palette ── (defined once, used everywhere) */
+:root {
+  --c0:#4477AA; --c1:#EE6677; --c2:#228833; --c3:#CCBB44;
+  --c4:#66CCEE; --c5:#AA3377; --c6:#BBBBBB; --c7:#EE7733;
+  --c8:#0077BB; --c9:#009988; --c10:#EE3377; --c11:#CC3311;
 }
 
-/* ── Base ───────────────────────────────────────────────────────── */
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-
-/* ── Header ─────────────────────────────────────────────────────── */
-.site-header{
-  background:var(--surf);
-  border-bottom:1px solid var(--border);
-  padding:14px 24px;
-  display:flex;
-  align-items:center;
-  gap:16px;
-  position:sticky;top:0;z-index:100;
+/* ── Light theme (default) ── */
+:root {
+  --bg:      #ffffff;
+  --bg2:     #f6f8fa;
+  --surf:    #f0f4f8;
+  --surf2:   #e4eaf0;
+  --border:  #d0d7de;
+  --text:    #1f2328;
+  --muted:   #656d76;
+  --accent:  #0969da;
+  --accent2: #1a7f37;
+  --plotbg:  #f6f8fa;
+  --gridc:   #e2e8f0;
+  --zeroc:   #c8d2db;
+  --shadow:  rgba(0,0,0,.1);
 }
-.site-header h1{font-size:1.1rem;font-weight:600;letter-spacing:.02em;white-space:nowrap}
-.site-header .subtitle{font-size:.78rem;color:var(--muted);white-space:nowrap}
-.badge-cluster{
-  display:inline-block;padding:2px 8px;border-radius:10px;
-  font-size:.7rem;font-weight:600;letter-spacing:.04em;
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --bg:      #0d1117;
+  --bg2:     #161b22;
+  --surf:    #161b22;
+  --surf2:   #21262d;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --accent:  #58a6ff;
+  --accent2: #3fb950;
+  --plotbg:  #0d1117;
+  --gridc:   #21262d;
+  --zeroc:   #30363d;
+  --shadow:  rgba(0,0,0,.3);
+}
+/* ── Auto dark from system when no manual preference ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg:#0d1117; --bg2:#161b22; --surf:#161b22; --surf2:#21262d;
+    --border:#30363d; --text:#e6edf3; --muted:#8b949e;
+    --accent:#58a6ff; --accent2:#3fb950;
+    --plotbg:#0d1117; --gridc:#21262d; --zeroc:#30363d; --shadow:rgba(0,0,0,.3);
+  }
 }
 
-/* ── Loading overlay ─────────────────────────────────────────────── */
-#loader{
-  position:fixed;inset:0;background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:9999;transition:opacity .4s;
-}
-#loader h2{font-size:1.2rem;margin-bottom:24px;color:var(--accent)}
-.loader-bar{width:320px;height:6px;background:var(--surf2);border-radius:3px;overflow:hidden}
-.loader-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));
-  width:0%;transition:width .3s;border-radius:3px}
-#loader-msg{margin-top:12px;font-size:.82rem;color:var(--muted)}
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
 
-/* ── Tabs ───────────────────────────────────────────────────────── */
-.nav-tabs{border-bottom:1px solid var(--border);padding:0 24px;background:var(--surf)}
-.nav-tabs .nav-link{color:var(--muted);border:none;border-bottom:2px solid transparent;
-  padding:10px 18px;font-size:.87rem;cursor:pointer;background:none}
-.nav-tabs .nav-link:hover{color:var(--text)}
-.nav-tabs .nav-link.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* ── Loading overlay ── */
+#loader { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 9999; transition: opacity .4s; }
+#loader h2 { font-size: 1.2rem; margin-bottom: 20px; color: var(--accent); }
+.loader-bar { width: 320px; height: 6px; background: var(--surf2); border-radius: 3px; overflow: hidden; }
+.loader-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 3px; transition: width .3s; }
+#loader-msg { margin-top: 10px; font-size: .8rem; color: var(--muted); }
 
-/* ── Panels ─────────────────────────────────────────────────────── */
-.tab-pane{display:none}.tab-pane.active{display:flex;flex-direction:column}
-.panel-inner{flex:1;display:flex;gap:0}
+/* ── Header ── */
+.site-header { background: var(--surf); border-bottom: 1px solid var(--border);
+  padding: 11px 20px; display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100; }
+.site-header h1 { font-size: 1.05rem; font-weight: 600; white-space: nowrap; }
+.site-header .sub { font-size: .75rem; color: var(--muted); }
+.hdr-badges { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+.badge-sm { font-size: .68rem; padding: 3px 8px; border-radius: 10px;
+  background: var(--surf2); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.badge-ok { color: var(--accent2); border-color: var(--accent2); background: color-mix(in srgb, var(--accent2) 10%, transparent); }
+.btn-icon { background: var(--surf2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: .9rem; line-height: 1; }
+.btn-icon:hover { background: var(--surf); }
 
-/* ── Sidebar ─────────────────────────────────────────────────────── */
-.sidebar{
-  width:220px;min-width:220px;background:var(--surf);
-  border-right:1px solid var(--border);
-  padding:14px;overflow-y:auto;
-  display:flex;flex-direction:column;gap:14px;
-}
-.sidebar-section h6{
-  font-size:.7rem;font-weight:700;letter-spacing:.08em;
-  color:var(--muted);text-transform:uppercase;margin-bottom:8px;
-}
-.cluster-item{
-  display:flex;align-items:center;gap:6px;font-size:.8rem;
-  cursor:pointer;padding:3px 0;border-radius:4px;
-}
-.cluster-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.cluster-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cluster-count{font-size:.7rem;color:var(--muted);flex-shrink:0}
-.sidebar select,.sidebar input[type=range]{
-  background:var(--surf2);border:1px solid var(--border);
-  color:var(--text);border-radius:6px;padding:4px 8px;width:100%;font-size:.8rem;
-}
-.sidebar input[type=range]{padding:0;cursor:pointer}
+/* ── Tabs ── */
+.nav-tabs { border-bottom: 1px solid var(--border); background: var(--surf);
+  padding: 0 20px; gap: 2px; display: flex; }
+.nav-tabs .nav-link { color: var(--muted); border: none; border-bottom: 2px solid transparent;
+  padding: 9px 16px; font-size: .84rem; cursor: pointer; background: none; white-space: nowrap; }
+.nav-tabs .nav-link:hover { color: var(--text); }
+.nav-tabs .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-/* ── Plot area ───────────────────────────────────────────────────── */
-.plot-area{flex:1;min-width:0;display:flex;flex-direction:column}
-#scatter-plot,#heatmap-plot{width:100%;flex:1}
+/* ── Tab pane layout ── */
+.tab-pane { display: none; }
+.tab-pane.active { display: flex; flex-direction: column; }
+.h-main { height: calc(100vh - 87px); overflow: hidden; } /* full page minus header+tabs */
 
-/* ── Gene info panel ─────────────────────────────────────────────── */
-#gene-panel{
-  background:var(--surf);border-top:1px solid var(--border);
-  padding:10px 16px;min-height:120px;max-height:240px;
-  display:flex;gap:16px;align-items:flex-start;overflow:hidden;
-}
-#gene-panel .gene-meta{min-width:160px}
-#gene-panel .gene-meta h5{font-size:.95rem;font-weight:600;margin-bottom:4px}
-#gene-panel .gene-meta p{font-size:.77rem;color:var(--muted);line-height:1.6}
-#codon-bar{flex:1;height:100%;min-width:0}
-.empty-panel{color:var(--muted);font-size:.83rem;font-style:italic;
-  width:100%;display:flex;align-items:center;justify-content:center}
+/* ── Sidebar ── */
+.sidebar { width: 200px; min-width: 200px; background: var(--surf); border-right: 1px solid var(--border);
+  padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.sb-title { font-size: .67rem; font-weight: 700; letter-spacing: .08em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+.sidebar select, .sidebar input[type=range] {
+  background: var(--surf2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 4px 8px; width: 100%; font-size: .78rem; }
+.sidebar input[type=range] { padding: 0; cursor: pointer; margin-top: 4px; }
 
-/* ── Table panel ─────────────────────────────────────────────────── */
-.table-toolbar{
-  background:var(--surf);border-bottom:1px solid var(--border);
-  padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-}
-.table-toolbar label{font-size:.8rem;color:var(--muted)}
-.table-toolbar select,.table-toolbar input{
-  background:var(--surf2);border:1px solid var(--border);
-  color:var(--text);border-radius:6px;padding:5px 10px;font-size:.82rem;
-}
-#table-wrap{padding:16px 20px;overflow:auto;flex:1}
+/* ── Cluster legend ── */
+.cl-item { display: flex; align-items: center; gap: 6px; font-size: .78rem;
+  cursor: pointer; padding: 2px 0; user-select: none; }
+.cl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cl-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-count { font-size: .68rem; color: var(--muted); flex-shrink: 0; }
 
-/* DataTables dark override */
-table.dataTable{color:var(--text)!important;border-color:var(--border)!important}
-table.dataTable thead th{
-  background:var(--surf2)!important;color:var(--muted)!important;
-  border-bottom:1px solid var(--border)!important;font-size:.78rem;
-}
-table.dataTable tbody tr{background:var(--bg)!important}
-table.dataTable tbody tr:nth-child(even){background:var(--surf)!important}
-table.dataTable tbody tr:hover{background:var(--surf2)!important;cursor:pointer}
-table.dataTable td{font-size:.8rem;border-color:var(--border)!important}
-.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter,
-.dataTables_wrapper .dataTables_info,.dataTables_wrapper .dataTables_paginate{
-  color:var(--muted)!important;font-size:.78rem}
-.dataTables_wrapper .dataTables_paginate .paginate_button{color:var(--muted)!important}
-.dataTables_wrapper .dataTables_paginate .paginate_button.current{
-  background:var(--surf2)!important;border-color:var(--border)!important;color:var(--accent)!important}
-.dataTables_wrapper .dataTables_filter input{
-  background:var(--surf2);border:1px solid var(--border);color:var(--text);
-  border-radius:6px;padding:4px 8px;margin-left:8px}
+/* ── Panel inner layout ── */
+.panel-inner { flex: 1; display: flex; min-height: 0; }
+.plot-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-/* ── Modal for codon detail ──────────────────────────────────────── */
-.modal-content{background:var(--surf);color:var(--text);border:1px solid var(--border)}
-.modal-header{border-bottom:1px solid var(--border)}
-.btn-close{filter:invert(1) grayscale(1)}
+/* ── Gene info panel ── */
+#gene-panel { background: var(--surf); border-top: 1px solid var(--border);
+  height: 170px; min-height: 170px; display: flex; gap: 12px;
+  padding: 10px 14px; overflow: hidden; }
+.gp-meta { min-width: 170px; max-width: 200px; }
+.gp-meta h5 { font-size: .92rem; font-weight: 600; margin-bottom: 4px; }
+.gp-meta p { font-size: .73rem; color: var(--muted); line-height: 1.7; }
+.gp-seq { flex: 0 0 220px; display: flex; flex-direction: column; }
+.gp-seq-label { font-size: .67rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 4px; }
+.seq-box { font-family: 'Courier New', monospace; font-size: .7rem; line-height: 1.5;
+  overflow: auto; flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 5px 7px; white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.empty-panel { width: 100%; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .82rem; font-style: italic; }
 
-/* ── Status badge ────────────────────────────────────────────────── */
-#codons-status{font-size:.72rem;padding:2px 8px;border-radius:10px;
-  background:var(--surf2);border:1px solid var(--border);white-space:nowrap}
+/* ── Synonymous / enrichment toolbar ── */
+.view-toolbar { background: var(--surf); border-bottom: 1px solid var(--border);
+  padding: 9px 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.view-toolbar label { font-size: .8rem; color: var(--muted); }
+.view-toolbar select { background: var(--surf2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 4px 10px; font-size: .8rem; }
 
-/* ── Utility ─────────────────────────────────────────────────────── */
-.h-full{height:calc(100vh - 108px)}   /* viewport minus header+tabs */
+/* ── Enrichment cards ── */
+.enrich-grid { display: flex; flex-wrap: wrap; gap: 14px; padding: 18px 20px; overflow-y: auto; flex: 1; }
+.enrich-card { background: var(--surf); border: 1px solid var(--border); border-radius: 10px;
+  width: 280px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.enrich-card-hdr { display: flex; align-items: center; gap: 8px; }
+.enrich-card-hdr h6 { font-size: .88rem; font-weight: 600; margin: 0; }
+.enrich-card-hdr .sub { font-size: .7rem; color: var(--muted); }
+.go-pill { font-size: .72rem; padding: 3px 9px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text); display: flex; flex-direction: column; gap: 1px; }
+.go-pill .tier-2 { font-size: .65rem; color: var(--muted); }
+.go-empty { color: var(--muted); font-size: .78rem; font-style: italic; padding: 6px 0; }
+
+/* ── Table toolbar ── */
+.tbl-toolbar { background: var(--surf); border-bottom: 1px solid var(--border);
+  padding: 10px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tbl-toolbar label { font-size: .78rem; color: var(--muted); }
+.tbl-toolbar select, .tbl-toolbar input[type=text] {
+  background: var(--surf2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 4px 9px; font-size: .78rem; }
+#table-wrap { flex: 1; overflow: auto; padding: 12px 18px; }
+
+/* ── DataTables dark/light overrides ── */
+table.dataTable { color: var(--text) !important; border-color: var(--border) !important; }
+table.dataTable thead th {
+  background: var(--surf2) !important; color: var(--muted) !important;
+  border-bottom: 1px solid var(--border) !important; font-size: .75rem; }
+table.dataTable tbody tr { background: var(--bg) !important; }
+table.dataTable tbody tr:nth-child(even) { background: var(--bg2) !important; }
+table.dataTable tbody tr:hover { background: var(--surf2) !important; cursor: pointer; }
+table.dataTable td { font-size: .78rem; border-color: var(--border) !important; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_paginate { color: var(--muted) !important; font-size: .75rem; }
+.dataTables_wrapper .dataTables_paginate .paginate_button { color: var(--muted) !important; }
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: var(--surf2) !important; border-color: var(--border) !important; color: var(--accent) !important; }
+.dataTables_wrapper .dataTables_filter input {
+  background: var(--surf2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 3px 8px; }
+
+/* ── Misc ── */
+.btn-dl { background: var(--surf2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: .78rem; white-space: nowrap; }
+.btn-dl:hover { background: var(--surf); }
+.cl-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .75rem;
+  padding: 2px 7px; border-radius: 10px; }
 </style>
 </head>
-
 <body>
 
-<!-- ══════════════════════ LOADING OVERLAY ══════════════════════════ -->
+<!-- ═══════ LOADING OVERLAY ═══════ -->
 <div id="loader">
-  <h2>🧬 Loading Codon Usage Data</h2>
-  <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
-  <p id="loader-msg">Fetching data…</p>
+  <h2>🧬 Loading Codon Data</h2>
+  <div class="loader-bar"><div class="loader-fill" id="lfill"></div></div>
+  <p id="loader-msg">Fetching…</p>
 </div>
 
-<!-- ══════════════════════ HEADER ════════════════════════════════════ -->
+<!-- ═══════ HEADER ═══════ -->
 <header class="site-header">
   <div>
     <h1>🧬 CCDS Codon Usage Explorer</h1>
-    <div class="subtitle">CCDS release 2022-10-27 · <span id="stat-genes">–</span> genes · <span id="stat-clusters">–</span> clusters</div>
+    <div class="sub">CCDS 2022-10-27 · <span id="stat-genes">–</span> genes · <span id="stat-cl">–</span> clusters</div>
   </div>
-  <div class="ms-auto d-flex align-items-center gap-3">
-    <span id="codons-status">⏳ Loading codon detail…</span>
+  <div class="hdr-badges">
+    <span class="badge-sm" id="status-codons">⏳ codon detail</span>
+    <span class="badge-sm" id="status-seq">– sequences</span>
+    <span class="badge-sm" id="status-enrich">– enrichment</span>
+    <button class="btn-icon" id="theme-btn" title="Toggle light/dark">🌙</button>
   </div>
 </header>
 
-<!-- ══════════════════════ TABS ══════════════════════════════════════ -->
+<!-- ═══════ TABS ═══════ -->
 <ul class="nav nav-tabs" id="main-tabs">
-  <li class="nav-item"><a class="nav-link active"  data-tab="scatter"  href="#">🔬 PCA Explorer</a></li>
-  <li class="nav-item"><a class="nav-link"         data-tab="heatmap"  href="#">🌡️ Codon Heatmap</a></li>
-  <li class="nav-item"><a class="nav-link"         data-tab="table"    href="#">📋 Gene Table</a></li>
+  <li class="nav-item"><a class="nav-link active" data-tab="scatter"    href="#">🔬 PCA Explorer</a></li>
+  <li class="nav-item"><a class="nav-link"         data-tab="heatmap"   href="#">🌡️ Cluster Heatmap</a></li>
+  <li class="nav-item"><a class="nav-link"         data-tab="synonymous"href="#">🔤 Synonymous Codons</a></li>
+  <li class="nav-item"><a class="nav-link"         data-tab="enrich"    href="#">🧪 GO Enrichment</a></li>
+  <li class="nav-item"><a class="nav-link"         data-tab="table"     href="#">📋 Gene Table</a></li>
 </ul>
 
-<!-- ══════════════════════ TAB PANES ══════════════════════════════════ -->
-
-<!-- ─── PCA Explorer ──────────────────────────────────────────────── -->
-<div class="tab-pane active h-full" id="tab-scatter">
-  <div class="panel-inner" style="height:calc(100% - 180px)">
-
+<!-- ═══════ PCA TAB ═══════ -->
+<div class="tab-pane active h-main" id="tab-scatter">
+  <div class="panel-inner" style="height: calc(100% - 170px)">
     <div class="sidebar">
-      <div class="sidebar-section">
-        <h6>Axes</h6>
-        <label style="font-size:.75rem;color:var(--muted)">X axis</label>
+      <div>
+        <div class="sb-title">Axes</div>
+        <label style="font-size:.72rem;color:var(--muted)">X</label>
         <select id="x-axis"><option value="0">PC1</option><option value="1">PC2</option><option value="2">PC3</option></select>
-        <label style="font-size:.75rem;color:var(--muted);margin-top:6px">Y axis</label>
+        <label style="font-size:.72rem;color:var(--muted);margin-top:6px">Y</label>
         <select id="y-axis"><option value="1">PC2</option><option value="0">PC1</option><option value="2">PC3</option></select>
       </div>
-
-      <div class="sidebar-section">
-        <h6>Point size</h6>
+      <div>
+        <div class="sb-title">Point size</div>
         <input type="range" id="pt-size" min="2" max="12" value="4">
       </div>
-
-      <div class="sidebar-section">
-        <h6>Clusters <span style="color:var(--muted);font-weight:400;font-size:.65rem">(click to toggle)</span></h6>
-        <div id="cluster-legend"></div>
+      <div style="flex:1">
+        <div class="sb-title">Clusters <span style="font-weight:400;font-size:.62rem">(click to hide)</span></div>
+        <div id="cl-legend"></div>
       </div>
-
-      <div class="sidebar-section" style="margin-top:auto">
-        <button class="btn btn-sm w-100" style="background:var(--surf2);border:1px solid var(--border);color:var(--text)"
-                id="reset-view">↺ Reset view</button>
-      </div>
+      <button class="btn-dl w-100" id="reset-view">↺ Reset view</button>
     </div>
-
     <div class="plot-area">
-      <div id="scatter-plot" style="flex:1"></div>
+      <div id="scatter-plot" style="flex:1;height:100%"></div>
     </div>
   </div>
-
-  <!-- Gene info panel -->
   <div id="gene-panel">
-    <div class="empty-panel" id="gene-panel-empty">Click a gene in the scatter plot to see its codon usage</div>
-    <div id="gene-panel-content" style="display:none;width:100%;display:flex;gap:16px">
-      <div class="gene-meta">
+    <div class="empty-panel" id="gp-empty">Click a gene to inspect its codon usage and sequence</div>
+    <div id="gp-content" style="display:none;width:100%;display:flex;gap:12px">
+      <div class="gp-meta">
         <h5 id="gp-name">–</h5>
-        <p id="gp-meta"></p>
+        <p id="gp-meta-text"></p>
       </div>
-      <div id="codon-bar" style="flex:1"></div>
+      <div style="flex:1;min-width:0"><div id="codon-bar" style="height:150px"></div></div>
+      <div class="gp-seq" id="gp-seq-wrap" style="display:none">
+        <div class="gp-seq-label">Protein sequence</div>
+        <div class="seq-box" id="seq-box"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ─── Codon Heatmap ─────────────────────────────────────────────── -->
-<div class="tab-pane h-full" id="tab-heatmap">
-  <div style="padding:10px 20px;background:var(--surf);border-bottom:1px solid var(--border);
-              display:flex;align-items:center;gap:16px;font-size:.82rem">
-    <span>Cluster centroids · codon frequency (normalized per-sense-codon)</span>
-    <span style="color:var(--muted);margin-left:auto">Hover cells for values. Clusters on Y-axis sorted by PC1 centroid.</span>
+<!-- ═══════ CLUSTER HEATMAP TAB ═══════ -->
+<div class="tab-pane h-main" id="tab-heatmap">
+  <div class="view-toolbar">
+    <span style="font-size:.82rem">Cluster centroid codon frequencies (sense codons normalised per gene)</span>
+    <span style="color:var(--muted);font-size:.75rem;margin-left:auto">Zoom / pan / hover for values</span>
   </div>
-  <div id="heatmap-plot" style="flex:1"></div>
+  <div id="heatmap-plot" style="flex:1;min-height:0"></div>
 </div>
 
-<!-- ─── Gene Table ────────────────────────────────────────────────── -->
-<div class="tab-pane h-full" id="tab-table" style="flex-direction:column">
-  <div class="table-toolbar">
-    <label>Filter cluster:
-      <select id="tbl-cluster-filter">
-        <option value="">All clusters</option>
+<!-- ═══════ SYNONYMOUS CODONS TAB ═══════ -->
+<div class="tab-pane h-main" id="tab-synonymous">
+  <div class="view-toolbar">
+    <label>View:
+      <select id="syn-source">
+        <option value="overall">Overall (all genes)</option>
       </select>
     </label>
-    <label>Chromosome:
-      <select id="tbl-chr-filter">
-        <option value="">All</option>
+    <label style="margin-left:12px">Metric:
+      <select id="syn-metric">
+        <option value="rscu">RSCU (relative synonymous codon usage)</option>
+        <option value="freq">Raw frequency</option>
       </select>
+    </label>
+    <span id="syn-gene-label" style="font-size:.75rem;color:var(--muted);margin-left:8px"></span>
+    <span style="color:var(--muted);font-size:.73rem;margin-left:auto">RSCU=1 → equal usage. >1 preferred. Cell text = codon triplet.</span>
+  </div>
+  <div id="syn-plot" style="flex:1;min-height:0"></div>
+</div>
+
+<!-- ═══════ GO ENRICHMENT TAB ═══════ -->
+<div class="tab-pane h-main" id="tab-enrich" style="flex-direction:column">
+  <div class="view-toolbar">
+    <span style="font-size:.82rem">STRING geneset descriptions per cluster (top 3 GO terms)</span>
+    <span style="color:var(--muted);font-size:.73rem;margin-left:auto">
+      Generated by <code>scripts/enrich.py</code> → commit <code>data/cluster_descriptions.json</code>
+    </span>
+  </div>
+  <div class="enrich-grid" id="enrich-grid">
+    <div style="color:var(--muted);font-size:.85rem;padding:20px">
+      Loading <code>cluster_descriptions.json</code>…
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ GENE TABLE TAB ═══════ -->
+<div class="tab-pane h-main" id="tab-table" style="flex-direction:column">
+  <div class="tbl-toolbar">
+    <label>Cluster:
+      <select id="f-cluster"><option value="">All</option></select>
+    </label>
+    <label>Chr:
+      <select id="f-chr"><option value="">All</option></select>
     </label>
     <label>Strand:
-      <select id="tbl-strand-filter">
-        <option value="">Both</option>
-        <option value="+">+</option>
-        <option value="-">−</option>
+      <select id="f-strand">
+        <option value="">Both</option><option value="+">+</option><option value="-">−</option>
       </select>
     </label>
-    <span id="tbl-info" style="margin-left:auto;font-size:.78rem;color:var(--muted)"></span>
+    <span id="tbl-info" style="font-size:.75rem;color:var(--muted);margin-left:auto"></span>
+    <button class="btn-dl" id="dl-csv">⬇ Download CSV</button>
   </div>
-  <div id="table-wrap" style="flex:1;overflow:auto;padding:12px 20px">
+  <div id="table-wrap">
     <table id="gene-table" class="table table-sm table-hover" style="width:100%">
-      <thead>
-        <tr>
-          <th>Gene</th><th>CCDS ID</th><th>Chr</th>
-          <th>Length (nt)</th><th>Strand</th><th>Cluster</th>
-        </tr>
-      </thead>
-      <tbody id="gene-table-body"></tbody>
+      <thead><tr>
+        <th>Gene</th><th>CCDS ID</th><th>Chr</th>
+        <th>Length (nt)</th><th>Strand</th><th>Cluster</th>
+      </tr></thead>
+      <tbody></tbody>
     </table>
   </div>
 </div>
 
-<!-- ══════════════════════ CODON DETAIL MODAL ═════════════════════════ -->
-<div class="modal fade" id="codon-modal" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modal-title">Codon Usage</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" style="padding:0">
-        <div id="modal-plot" style="height:420px"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════ SCRIPTS ═══════════════════════════════════ -->
+<!-- ═══════ SCRIPTS ═══════ -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-
 <script>
-// ═══════════════════════════════════════════════════════════════════
-// Constants & helpers
-// ═══════════════════════════════════════════════════════════════════
-const CLUSTER_COLORS = [
-  '#4c78a8','#f58518','#e45756','#72b7b2','#54a24b','#eeca3b',
-  '#b279a2','#ff9da6','#9d755d','#bab0ac','#79706e','#d67195',
-  '#c3a57b','#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0',
-  '#f0027f','#bf5b17',
+'use strict';
+
+// ══════════════════════════════════════════════════════════════════
+//  COLOR PALETTE  (Paul Tol "bright" — colorblind-safe for 12 groups)
+// ══════════════════════════════════════════════════════════════════
+const CB12 = [
+  '#4477AA','#EE6677','#228833','#CCBB44',
+  '#66CCEE','#AA3377','#BBBBBB','#EE7733',
+  '#0077BB','#009988','#EE3377','#CC3311',
 ];
+function clusterColor(i){ return CB12[i % CB12.length]; }
 
-function clusterColor(i){ return CLUSTER_COLORS[i % CLUSTER_COLORS.length]; }
+// Read a CSS custom property as a string
+function tc(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
-function setProgress(pct, msg){
-  document.getElementById('loader-fill').style.width = pct + '%';
+// ══════════════════════════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════════════════════════
+function initTheme(){
+  const saved = localStorage.getItem('codon-theme');
+  if(saved){
+    document.documentElement.dataset.theme = saved;
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
+  }
+  updateThemeBtn();
+}
+function updateThemeBtn(){
+  document.getElementById('theme-btn').textContent =
+    document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙';
+}
+document.getElementById('theme-btn').addEventListener('click', ()=>{
+  const cur  = document.documentElement.dataset.theme;
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('codon-theme', next);
+  updateThemeBtn();
+  if(DATA){ buildScatterPlot(); buildHeatmap(); if(activeSynSource) buildSynonymousPlot(activeSynSource); }
+});
+initTheme();
+
+// ══════════════════════════════════════════════════════════════════
+//  GLOBAL STATE
+// ══════════════════════════════════════════════════════════════════
+let DATA      = null;
+let CODONS    = null;
+let SEQS      = null;
+let ENRICH    = null;
+let GENE_TABLE      = null;
+let HIDDEN_CLUSTERS = new Set();
+let selectedGeneIdx = null;
+let activeSynSource = 'overall';
+
+// ══════════════════════════════════════════════════════════════════
+//  LOADING HELPERS
+// ══════════════════════════════════════════════════════════════════
+function setProgress(p, msg){
+  document.getElementById('lfill').style.width = p + '%';
   if(msg) document.getElementById('loader-msg').textContent = msg;
 }
+function setBadge(id, text, ok=false){
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.classList.toggle('badge-ok', ok);
+}
 
-// ═══════════════════════════════════════════════════════════════════
-// Global state
-// ═══════════════════════════════════════════════════════════════════
-let DATA       = null;   // data.json contents
-let CODONS     = null;   // codons.json matrix (null until loaded)
-let GENE_TABLE = null;   // DataTables instance
-let HIDDEN_CLUSTERS = new Set();
-
-// Axis indices (0=PC1, 1=PC2, 2=PC3)
-let xAxis = 0, yAxis = 1;
-
-// ═══════════════════════════════════════════════════════════════════
-// Tabs
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════════════════
 document.querySelectorAll('#main-tabs .nav-link').forEach(link=>{
   link.addEventListener('click', e=>{
     e.preventDefault();
@@ -341,153 +422,164 @@ document.querySelectorAll('#main-tabs .nav-link').forEach(link=>{
     const tab = link.dataset.tab;
     document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+tab).classList.add('active');
-    // Relayout plots on tab switch (size may have changed)
-    if(tab==='scatter') Plotly.Plots.resize('scatter-plot');
-    if(tab==='heatmap') Plotly.Plots.resize('heatmap-plot');
+    if(tab==='scatter')    Plotly.Plots.resize('scatter-plot');
+    if(tab==='heatmap')    Plotly.Plots.resize('heatmap-plot');
+    if(tab==='synonymous') Plotly.Plots.resize('syn-plot');
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// Load main data.json
-// ═══════════════════════════════════════════════════════════════════
-async function loadData(){
-  setProgress(10, 'Fetching gene metadata…');
-  const resp = await fetch('data.json');
-  setProgress(50, 'Parsing…');
-  DATA = await resp.json();
-  setProgress(80, 'Rendering…');
+// ══════════════════════════════════════════════════════════════════
+//  MAIN BOOT
+// ══════════════════════════════════════════════════════════════════
+async function main(){
+  setProgress(10,'Fetching data.json…');
+  DATA = await fetch('data.json').then(r=>r.json());
+  setProgress(60,'Rendering…');
 
-  document.getElementById('stat-genes').textContent    = DATA.genes.length.toLocaleString();
-  document.getElementById('stat-clusters').textContent = DATA.n_clusters;
+  document.getElementById('stat-genes').textContent = DATA.genes.length.toLocaleString();
+  document.getElementById('stat-cl').textContent    = DATA.n_clusters;
 
   buildClusterLegend();
   buildScatterPlot();
   buildHeatmap();
+  buildSynonymousControls();
+  buildSynonymousPlot('overall');
   buildTable();
   populateTableFilters();
 
-  setProgress(100, 'Done');
+  setProgress(100,'Done');
   setTimeout(()=>{
     const el = document.getElementById('loader');
-    el.style.opacity='0';
+    el.style.opacity = '0';
     setTimeout(()=>el.remove(), 400);
-  }, 300);
+  }, 250);
 
-  // Start loading codons.json in background
+  // Background loads
   loadCodons();
+  loadSequences();
+  loadEnrichment();
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Load codons.json (background, async)
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  BACKGROUND: codons.json
+// ══════════════════════════════════════════════════════════════════
 async function loadCodons(){
   try{
-    const resp = await fetch('codons.json');
-    const j    = await resp.json();
+    const j = await fetch('codons.json').then(r=>r.json());
     CODONS = j.matrix;
-    document.getElementById('codons-status').textContent = '✓ Codon detail ready';
-    document.getElementById('codons-status').style.color = 'var(--accent2)';
+    setBadge('status-codons','✓ codon detail', true);
+    // If a gene was clicked while loading, update its bar now
+    if(selectedGeneIdx !== null) updateCodonBar(selectedGeneIdx);
+  } catch(e){ setBadge('status-codons','⚠ codons unavail'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BACKGROUND: sequences.json (lazy – only when first clicked)
+// ══════════════════════════════════════════════════════════════════
+let seqLoadPromise = null;
+async function loadSequences(){
+  if(seqLoadPromise) return seqLoadPromise;
+  seqLoadPromise = fetch('sequences.json')
+    .then(r=>{ if(!r.ok) throw new Error('Not found'); return r.json(); })
+    .then(j=>{
+      SEQS = j;
+      setBadge('status-seq','✓ sequences', true);
+      if(selectedGeneIdx !== null) showSequence(selectedGeneIdx);
+    })
+    .catch(()=>{ setBadge('status-seq','– no FASTA'); });
+  return seqLoadPromise;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BACKGROUND: cluster_descriptions.json
+// ══════════════════════════════════════════════════════════════════
+async function loadEnrichment(){
+  try{
+    const j = await fetch('cluster_descriptions.json').then(r=>{
+      if(!r.ok) throw new Error('Not found');
+      return r.json();
+    });
+    ENRICH = j.clusters;
+    setBadge('status-enrich','✓ enrichment', true);
+    buildEnrichmentView();
   } catch(e){
-    document.getElementById('codons-status').textContent = '⚠ Codon detail unavailable';
-    console.warn('codons.json not loaded:', e);
+    setBadge('status-enrich','– no enrichment');
+    document.getElementById('enrich-grid').innerHTML =
+      `<div style="color:var(--muted);font-size:.85rem;padding:20px">
+        <b>No enrichment data found.</b><br><br>
+        Run locally: <code>python scripts/enrich.py</code><br>
+        Then commit <code>data/cluster_descriptions.json</code><br>
+        Or trigger the <b>Run STRING Enrichment</b> GitHub Actions workflow.
+       </div>`;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Cluster legend
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  CLUSTER LEGEND
+// ══════════════════════════════════════════════════════════════════
 function buildClusterLegend(){
-  const el = document.getElementById('cluster-legend');
+  const el = document.getElementById('cl-legend');
   el.innerHTML = '';
   for(let j=0; j<DATA.n_clusters; j++){
-    const size = DATA.cluster_sizes[j];
-    const div  = document.createElement('div');
-    div.className = 'cluster-item';
-    div.dataset.cluster = j;
-    div.innerHTML = `
-      <div class="cluster-dot" style="background:${clusterColor(j)}"></div>
-      <span class="cluster-label">Cluster ${j}</span>
-      <span class="cluster-count">${size.toLocaleString()}</span>`;
-    div.addEventListener('click', ()=> toggleCluster(j, div));
-    el.appendChild(div);
-  }
-  // fill cluster filter in table tab
-  const sel = document.getElementById('tbl-cluster-filter');
-  for(let j=0; j<DATA.n_clusters; j++){
-    sel.innerHTML += `<option value="${j}">Cluster ${j} (${DATA.cluster_sizes[j].toLocaleString()})</option>`;
+    const d = document.createElement('div');
+    d.className = 'cl-item';
+    d.dataset.cluster = j;
+    d.innerHTML =
+      `<div class="cl-dot" style="background:${clusterColor(j)}"></div>
+       <span class="cl-label">Cluster ${j}</span>
+       <span class="cl-count">${DATA.cluster_sizes[j].toLocaleString()}</span>`;
+    d.addEventListener('click', ()=>{
+      if(HIDDEN_CLUSTERS.has(j)){ HIDDEN_CLUSTERS.delete(j); d.style.opacity='1'; }
+      else                       { HIDDEN_CLUSTERS.add(j);   d.style.opacity='0.3'; }
+      buildScatterPlot();
+    });
+    el.appendChild(d);
   }
 }
 
-function toggleCluster(j, div){
-  if(HIDDEN_CLUSTERS.has(j)){
-    HIDDEN_CLUSTERS.delete(j);
-    div.style.opacity='1';
-  } else {
-    HIDDEN_CLUSTERS.add(j);
-    div.style.opacity='0.3';
-  }
-  buildScatterPlot();
-}
+// ══════════════════════════════════════════════════════════════════
+//  PCA SCATTER PLOT
+// ══════════════════════════════════════════════════════════════════
+function buildScatterPlot(){
+  const xi = parseInt(document.getElementById('x-axis').value);
+  const yi = parseInt(document.getElementById('y-axis').value);
+  const pt = parseInt(document.getElementById('pt-size').value);
+  const PClabels = ['PC1','PC2','PC3'];
 
-// ═══════════════════════════════════════════════════════════════════
-// Scatter plot (PCA)
-// ═══════════════════════════════════════════════════════════════════
-function getScatterTraces(){
-  const pcIdx = [
-    parseInt(document.getElementById('x-axis').value),
-    parseInt(document.getElementById('y-axis').value),
-  ];
-  const pcLabels = ['PC1','PC2','PC3'];
-
-  // One trace per cluster for legend + individual toggling
   const traces = [];
   for(let j=0; j<DATA.n_clusters; j++){
     if(HIDDEN_CLUSTERS.has(j)) continue;
-
     const xs=[], ys=[], text=[], ids=[];
     for(let i=0; i<DATA.genes.length; i++){
       const g = DATA.genes[i];
-      if(g[5]!==j) continue;       // cluster index
-      xs.push(g[6 + pcIdx[0]]);    // pc1/2/3 stored at indices 6,7,8
-      ys.push(g[6 + pcIdx[1]]);
-      text.push(`<b>${g[0]}</b><br>${g[1]}<br>Chr ${g[2]} ${g[4]}<br>Len ${g[3].toLocaleString()} nt<br>Cluster ${j}`);
+      if(g[5]!==j) continue;
+      xs.push(g[6+xi]); ys.push(g[6+yi]);
+      text.push(`<b>${g[0]}</b><br>${g[1]}<br>Chr ${g[2]} ${g[4]}<br>${g[3].toLocaleString()} nt<br>Cluster ${j}`);
       ids.push(i);
     }
-
-    const ptSize = parseInt(document.getElementById('pt-size').value);
     traces.push({
       type:'scattergl', mode:'markers',
-      name:`Cluster ${j} (${DATA.cluster_sizes[j].toLocaleString()})`,
-      x:xs, y:ys, text:text, ids:ids,
+      name:`Cluster ${j}`,
+      x:xs, y:ys, text, ids,
       hovertemplate:'%{text}<extra></extra>',
-      marker:{ color:clusterColor(j), size:ptSize, opacity:0.75,
-               line:{width:0} },
+      marker:{ color:clusterColor(j), size:pt, opacity:.75, line:{width:0} },
     });
   }
-  return {traces, pcLabels, pcIdx};
-}
 
-function buildScatterPlot(){
-  const {traces, pcLabels, pcIdx} = getScatterTraces();
   const layout = {
-    paper_bgcolor:'transparent', plot_bgcolor:'#0d1117',
+    paper_bgcolor: tc('--bg'), plot_bgcolor: tc('--plotbg'),
     margin:{l:50,r:20,t:30,b:50},
     xaxis:{
-      title:{ text:`${pcLabels[pcIdx[0]]} (${(DATA.explained_variance[pcIdx[0]]*100).toFixed(1)}%)`,
-              font:{size:11,color:'#8b949e'} },
-      color:'#8b949e', gridcolor:'#21262d', zerolinecolor:'#30363d',
+      title:{text:`${PClabels[xi]} (${(DATA.explained_variance[xi]*100).toFixed(1)}%)`,font:{size:11,color:tc('--muted')}},
+      color:tc('--muted'), gridcolor:tc('--gridc'), zerolinecolor:tc('--zeroc'),
     },
     yaxis:{
-      title:{ text:`${pcLabels[pcIdx[1]]} (${(DATA.explained_variance[pcIdx[1]]*100).toFixed(1)}%)`,
-              font:{size:11,color:'#8b949e'} },
-      color:'#8b949e', gridcolor:'#21262d', zerolinecolor:'#30363d',
+      title:{text:`${PClabels[yi]} (${(DATA.explained_variance[yi]*100).toFixed(1)}%)`,font:{size:11,color:tc('--muted')}},
+      color:tc('--muted'), gridcolor:tc('--gridc'), zerolinecolor:tc('--zeroc'),
     },
-    legend:{
-      bgcolor:'rgba(22,27,34,0.85)', bordercolor:'#30363d', borderwidth:1,
-      font:{size:10,color:'#8b949e'}, itemsizing:'constant',
-    },
-    dragmode:'zoom',
-    hoverlabel:{bgcolor:'#21262d',bordercolor:'#30363d',font:{size:11}},
+    legend:{ bgcolor:tc('--surf')+'dd', bordercolor:tc('--border'), borderwidth:1,
+             font:{size:10,color:tc('--muted')}, itemsizing:'constant' },
+    hoverlabel:{ bgcolor:tc('--surf2'), bordercolor:tc('--border'), font:{size:11} },
   };
 
   Plotly.react('scatter-plot', traces, layout, {
@@ -496,253 +588,435 @@ function buildScatterPlot(){
     displaylogo:false,
   });
 
-  document.getElementById('scatter-plot').on('plotly_click', onScatterClick);
-  document.getElementById('scatter-plot').on('plotly_selected', onScatterSelected);
-}
-
-// ── Gene click handler ──────────────────────────────────────────────
-function onScatterClick(evData){
-  if(!evData || !evData.points || evData.points.length===0) return;
-  const pt  = evData.points[0];
-  const idx = pt.data.ids[pt.pointIndex];
-  showGenePanel(idx);
-}
-
-function onScatterSelected(evData){
-  if(!evData || !evData.points || evData.points.length===0) return;
-  // Highlight selected genes in table
-  const genes = evData.points.map(p=> DATA.genes[p.data.ids[p.pointIndex]][0]);
-  if(GENE_TABLE){
-    GENE_TABLE.search(genes.length===1 ? genes[0] : '').draw();
-  }
-}
-
-// ── Gene info panel ─────────────────────────────────────────────────
-function showGenePanel(geneIdx){
-  const g = DATA.genes[geneIdx];
-  document.getElementById('gene-panel-empty').style.display = 'none';
-  document.getElementById('gene-panel-content').style.display = 'flex';
-  document.getElementById('gp-name').textContent = g[0];
-  document.getElementById('gp-meta').innerHTML =
-    `CCDS: ${g[1]}<br>Chr ${g[2]} ${g[4]}<br>` +
-    `Length: ${g[3].toLocaleString()} nt<br>` +
-    `Cluster: <span class="badge-cluster" style="background:${clusterColor(g[5])}20;
-       color:${clusterColor(g[5])};border:1px solid ${clusterColor(g[5])}40">${g[5]}</span>`;
-
-  if(CODONS){
-    plotCodonBar('codon-bar', geneIdx, 120);
-  } else {
-    document.getElementById('codon-bar').innerHTML =
-      '<div style="color:var(--muted);font-size:.78rem;padding:20px">'+
-      'Codon detail loading… (codons.json)</div>';
-  }
-}
-
-function plotCodonBar(divId, geneIdx, height){
-  const rawCounts = CODONS[geneIdx];
-  const colNames  = DATA.codon_cols;
-  const total     = rawCounts.reduce((a,b)=>a+b,0)||1;
-  const freqs     = rawCounts.map(v=>v/total);
-
-  // Group by amino acid
-  const aaGroups = {};
-  colNames.forEach((c,i)=>{
-    const aa = c.split('-')[1]||'?';
-    if(!aaGroups[aa]) aaGroups[aa]={codons:[],freqs:[]};
-    aaGroups[aa].codons.push(c.split('-')[0]);
-    aaGroups[aa].freqs.push(freqs[i]);
+  const el = document.getElementById('scatter-plot');
+  el.removeAllListeners && el.removeAllListeners('plotly_click');
+  el.on('plotly_click', ev=>{
+    if(!ev || !ev.points || !ev.points.length) return;
+    const pt2 = ev.points[0];
+    onGeneSelect(pt2.data.ids[pt2.pointIndex]);
   });
+}
 
-  const labels=[], values=[], colors=[], groups=[];
-  const aaPalette = ['#4c78a8','#f58518','#e45756','#72b7b2','#54a24b',
-                     '#eeca3b','#b279a2','#ff9da6','#9d755d','#bab0ac'];
-  let ci=0;
-  for(const [aa, {codons,freqs:fs}] of Object.entries(aaGroups).sort()){
-    const col = aaPalette[ci++ % aaPalette.length];
-    codons.forEach((cod,k)=>{
-      labels.push(cod+'-'+aa);
-      values.push(fs[k]);
-      colors.push(col);
-      groups.push(aa);
-    });
+document.getElementById('x-axis').addEventListener('change', buildScatterPlot);
+document.getElementById('y-axis').addEventListener('change', buildScatterPlot);
+document.getElementById('pt-size').addEventListener('input',  buildScatterPlot);
+document.getElementById('reset-view').addEventListener('click',()=>
+  Plotly.relayout('scatter-plot',{'xaxis.autorange':true,'yaxis.autorange':true}));
+
+// ══════════════════════════════════════════════════════════════════
+//  GENE PANEL (fires on scatter click OR table row click)
+// ══════════════════════════════════════════════════════════════════
+function onGeneSelect(idx){
+  selectedGeneIdx = idx;
+  const g = DATA.genes[idx];
+
+  document.getElementById('gp-empty').style.display = 'none';
+  const content = document.getElementById('gp-content');
+  content.style.display = 'flex';
+
+  document.getElementById('gp-name').textContent = g[0];
+  document.getElementById('gp-meta-text').innerHTML =
+    `<b>CCDS:</b> ${g[1]}<br><b>Chr:</b> ${g[2]} ${g[4]}<br>` +
+    `<b>Length:</b> ${g[3].toLocaleString()} nt<br>` +
+    `<b>Cluster:</b> <span class="cl-badge" style="background:${clusterColor(g[5])}22;color:${clusterColor(g[5])};border:1px solid ${clusterColor(g[5])}44">${g[5]}</span>`;
+
+  // Add option to syn selector
+  const synSel = document.getElementById('syn-source');
+  if(![...synSel.options].find(o=>o.value==='gene')){
+    const opt = document.createElement('option');
+    opt.value='gene'; opt.text=`Gene: ${g[0]}`; synSel.appendChild(opt);
+  } else {
+    synSel.options[[...synSel.options].findIndex(o=>o.value==='gene')].text = `Gene: ${g[0]}`;
+  }
+  document.getElementById('syn-gene-label').textContent = `Selected: ${g[0]}`;
+
+  // Codon bar
+  if(CODONS) updateCodonBar(idx);
+  else document.getElementById('codon-bar').innerHTML =
+    '<div style="color:var(--muted);font-size:.75rem;padding:10px">Loading codon detail…</div>';
+
+  // Sequence
+  if(SEQS) showSequence(idx);
+  else loadSequences();  // trigger background load if not started yet
+}
+
+function updateCodonBar(idx){
+  if(!CODONS) return;
+  const raw      = CODONS[idx];
+  const cols     = DATA.codon_cols;
+  const total    = raw.reduce((a,b)=>a+b,0)||1;
+  const sortedCols = DATA.codon_cols_sorted;
+
+  // Remap to sorted order, group by AA for colouring
+  const xs=[], ys=[], colors=[];
+  const aaPalette = ['#4477AA','#EE6677','#228833','#CCBB44','#66CCEE','#AA3377',
+                     '#EE7733','#0077BB','#009988','#EE3377','#CC3311','#BBBBBB'];
+  let aaList = Object.keys(DATA.aa_groups).sort(), ci=0;
+  const aaColor = {};
+  aaList.forEach(aa=>{ aaColor[aa]=aaPalette[ci++ % aaPalette.length]; });
+
+  for(const c of sortedCols){
+    const origIdx = cols.indexOf(c);
+    const aa      = c.split('-')[1]||'?';
+    xs.push(c.split('-')[0]+'-'+aa);
+    ys.push(raw[origIdx]/total);
+    colors.push(aaColor[aa]||'#888');
   }
 
-  const trace={type:'bar',x:labels,y:values,
+  Plotly.react('codon-bar',[{
+    type:'bar', x:xs, y:ys,
     marker:{color:colors},
-    hovertemplate:'%{x}<br>freq: %{y:.3f}<extra></extra>',
-    showlegend:false};
-
-  Plotly.react(divId,[trace],{
-    paper_bgcolor:'transparent',plot_bgcolor:'transparent',
-    margin:{l:30,r:10,t:10,b:50},height:height||200,
-    xaxis:{tickfont:{size:8},color:'#8b949e',gridcolor:'#21262d',tickangle:-60},
-    yaxis:{color:'#8b949e',gridcolor:'#21262d',tickfont:{size:9}},
-    bargap:0.1,
+    hovertemplate:'%{x}<br>freq: %{y:.4f}<extra></extra>',
+  }],{
+    paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+    margin:{l:30,r:6,t:8,b:55}, height:148,
+    xaxis:{tickfont:{size:7},color:tc('--muted'),tickangle:-60,gridcolor:tc('--gridc')},
+    yaxis:{tickfont:{size:8},color:tc('--muted'),gridcolor:tc('--gridc')},
+    bargap:.06,
   },{responsive:true,displayModeBar:false});
 }
 
-// Axes / size controls
-document.getElementById('x-axis').addEventListener('change',()=>buildScatterPlot());
-document.getElementById('y-axis').addEventListener('change',()=>buildScatterPlot());
-document.getElementById('pt-size').addEventListener('input',()=>buildScatterPlot());
-document.getElementById('reset-view').addEventListener('click',()=>Plotly.relayout('scatter-plot',{'xaxis.autorange':true,'yaxis.autorange':true}));
-
-// ═══════════════════════════════════════════════════════════════════
-// Heatmap (cluster centroids × codons)
-// ═══════════════════════════════════════════════════════════════════
-function buildHeatmap(){
-  const codons   = DATA.codon_cols_sorted;
-  const cents    = DATA.centroids;  // [cluster][codon_sorted]
-
-  // Y labels = cluster index + size
-  const yLabels  = cents.map((_,j)=>`Cluster ${j} (n=${DATA.cluster_sizes[j].toLocaleString()})`);
-
-  // Colour scale: min→max
-  const zData    = cents.map(row=>[...row]);
-
-  const trace = {
-    type:'heatmap', z:zData, x:codons, y:yLabels,
-    colorscale:'Viridis',
-    hovertemplate:'Codon: %{x}<br>Cluster: %{y}<br>Freq: %{z:.4f}<extra></extra>',
-    colorbar:{
-      len:0.8, thickness:14,
-      tickfont:{size:9,color:'#8b949e'}, outlinewidth:0,
-    },
-  };
-
-  const layout={
-    paper_bgcolor:'transparent', plot_bgcolor:'#0d1117',
-    margin:{l:190,r:60,t:30,b:120},
-    xaxis:{
-      tickfont:{size:8,color:'#8b949e'}, tickangle:-60,
-      color:'#8b949e', gridcolor:'#21262d',
-      title:{text:'Codon (sorted by amino acid)',font:{size:10,color:'#8b949e'}},
-    },
-    yaxis:{
-      tickfont:{size:10,color:'#8b949e'}, color:'#8b949e',
-      autorange:'reversed',
-    },
-  };
-
-  Plotly.newPlot('heatmap-plot',[trace],layout,{responsive:true,displaylogo:false,
-    modeBarButtonsToRemove:['lasso2d','select2d'],displayModeBar:true});
+function showSequence(idx){
+  if(!SEQS || !DATA) return;
+  const ccds = DATA.genes[idx][1];
+  const rec  = SEQS[ccds];
+  const wrap = document.getElementById('gp-seq-wrap');
+  const box  = document.getElementById('seq-box');
+  if(!rec){ wrap.style.display='none'; return; }
+  wrap.style.display = 'flex';
+  // Colour protein sequence by residue class
+  const hydrophobic = new Set('AVILMFYW');
+  const charged_pos = new Set('KRH');
+  const charged_neg = new Set('DE');
+  const polar       = new Set('STNQCG');
+  let html = '';
+  for(const aa of rec.seq){
+    let col = tc('--muted');
+    if(hydrophobic.has(aa))  col='#0077BB';
+    if(charged_pos.has(aa))  col='#EE6677';
+    if(charged_neg.has(aa))  col='#EE7733';
+    if(polar.has(aa))        col='#228833';
+    html += `<span style="color:${col}">${aa}</span>`;
+  }
+  box.innerHTML = html;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Gene table (DataTables)
-// ═══════════════════════════════════════════════════════════════════
-function buildTable(){
-  const tbody = document.getElementById('gene-table-body');
-  tbody.innerHTML = '';
-  DATA.genes.forEach((g,i)=>{
-    const cl = g[5];
-    const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;
-      background:${clusterColor(cl)};margin-right:4px"></span>`;
-    const tr  = `<tr data-idx="${i}">
-      <td><b>${g[0]}</b></td>
-      <td style="color:var(--muted)">${g[1]}</td>
-      <td>${g[2]}</td>
-      <td>${g[3].toLocaleString()}</td>
-      <td>${g[4]}</td>
-      <td>${dot}${cl}</td>
-    </tr>`;
-    tbody.insertAdjacentHTML('beforeend', tr);
+// ══════════════════════════════════════════════════════════════════
+//  CLUSTER CENTROID HEATMAP
+// ══════════════════════════════════════════════════════════════════
+function buildHeatmap(){
+  const cols  = DATA.codon_cols_sorted;
+  const cents = DATA.centroids;
+  const yLbls = cents.map((_,j)=>`C${j} (n=${DATA.cluster_sizes[j].toLocaleString()})`);
+
+  Plotly.react('heatmap-plot',[{
+    type:'heatmap', z:cents, x:cols, y:yLbls,
+    colorscale:'Viridis',
+    hovertemplate:'Codon: %{x}<br>Cluster: %{y}<br>Freq: %{z:.5f}<extra></extra>',
+    colorbar:{ len:.8, thickness:13, tickfont:{size:9,color:tc('--muted')}, outlinewidth:0 },
+  }],{
+    paper_bgcolor:tc('--bg'), plot_bgcolor:tc('--plotbg'),
+    margin:{l:110,r:60,t:30,b:120},
+    xaxis:{
+      tickfont:{size:8,color:tc('--muted')}, tickangle:-60, color:tc('--muted'),
+      title:{text:'Codon (sorted by amino acid)',font:{size:10,color:tc('--muted')}},
+    },
+    yaxis:{ tickfont:{size:10,color:tc('--muted')}, color:tc('--muted'), autorange:'reversed' },
+  },{responsive:true,displaylogo:false});
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SYNONYMOUS CODON USAGE (RSCU)
+// ══════════════════════════════════════════════════════════════════
+function buildSynonymousControls(){
+  const sel = document.getElementById('syn-source');
+  for(let j=0; j<DATA.n_clusters; j++){
+    const o = document.createElement('option');
+    o.value = 'c'+j;
+    o.text  = `Cluster ${j} (n=${DATA.cluster_sizes[j].toLocaleString()})`;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', ()=>{
+    activeSynSource = sel.value;
+    buildSynonymousPlot(activeSynSource);
   });
+  document.getElementById('syn-metric').addEventListener('change', ()=>{
+    buildSynonymousPlot(activeSynSource);
+  });
+}
+
+function getFreqsForSource(src){
+  if(src === 'overall') return DATA.overall_frequencies;
+  if(src.startsWith('c'))  return DATA.centroids[parseInt(src.slice(1))];
+  if(src === 'gene' && selectedGeneIdx !== null && CODONS){
+    const raw   = CODONS[selectedGeneIdx];
+    const cols  = DATA.codon_cols;
+    const total = raw.reduce((a,b)=>a+b,0)||1;
+    // remap to sorted order
+    return DATA.codon_cols_sorted.map(c=>{
+      const i = cols.indexOf(c);
+      return raw[i]/total;
+    });
+  }
+  return DATA.overall_frequencies;
+}
+
+function computeRSCU(freqsSorted){
+  const rscu = freqsSorted.slice();
+  for(const [aa, indices] of Object.entries(DATA.aa_groups)){
+    const total    = indices.reduce((s,i)=>s+freqsSorted[i],0);
+    const expected = total / indices.length;
+    if(expected < 1e-9){ indices.forEach(i=>rscu[i]=0); continue; }
+    indices.forEach(i=>{ rscu[i] = freqsSorted[i] / expected; });
+  }
+  return rscu;
+}
+
+function buildSynonymousPlot(src){
+  const freqs  = getFreqsForSource(src);
+  const metric = document.getElementById('syn-metric').value;
+  const vals   = metric==='rscu' ? computeRSCU(freqs) : freqs;
+
+  const AAs    = Object.keys(DATA.aa_groups).sort();
+  const maxSyn = Math.max(...AAs.map(aa=>DATA.aa_groups[aa].length));
+
+  // Build z matrix and codon-name text matrix
+  const z=[], zText=[];
+  for(const aa of AAs){
+    const indices = DATA.aa_groups[aa];
+    const row=[], rowTxt=[];
+    for(let k=0; k<maxSyn; k++){
+      if(k < indices.length){
+        row.push(parseFloat(vals[indices[k]].toFixed(4)));
+        rowTxt.push(DATA.codon_cols_sorted[indices[k]].split('-')[0]);  // triplet
+      } else {
+        row.push(null);
+        rowTxt.push('');
+      }
+    }
+    z.push(row);
+    zText.push(rowTxt);
+  }
+
+  const xLabels = Array.from({length:maxSyn},(_,k)=>`Syn ${k+1}`);
+  const isRSCU  = metric==='rscu';
+
+  Plotly.react('syn-plot',[{
+    type:'heatmap',
+    z, x:xLabels, y:AAs,
+    text:zText,
+    texttemplate:'%{text}',
+    textfont:{size:9,color:'rgba(0,0,0,0.7)'},
+    colorscale: isRSCU
+      ? [[0,'#4477AA'],[0.5,'#f6f8fa'],[1,'#CC3311']]    // blue-white-red for RSCU
+      : 'YlOrRd',
+    zmid: isRSCU ? 1 : undefined,
+    zmin: isRSCU ? 0 : undefined,
+    colorbar:{
+      len:.8, thickness:13,
+      tickfont:{size:9,color:tc('--muted')}, outlinewidth:0,
+      title:{text: isRSCU ? 'RSCU' : 'Freq', font:{size:10,color:tc('--muted')}},
+    },
+    hovertemplate:'AA: %{y}<br>Codon: %{text}<br>'+(isRSCU?'RSCU':'Freq')+': %{z:.3f}<extra></extra>',
+  }],{
+    paper_bgcolor:tc('--bg'), plot_bgcolor:tc('--plotbg'),
+    margin:{l:60,r:80,t:30,b:60},
+    xaxis:{tickfont:{size:10,color:tc('--muted')},color:tc('--muted'),
+           title:{text:'Synonymous codon position (sorted by frequency)',font:{size:10,color:tc('--muted')}}},
+    yaxis:{tickfont:{size:10,color:tc('--muted')},color:tc('--muted'),autorange:'reversed',
+           title:{text:'Amino acid (1-letter)',font:{size:10,color:tc('--muted')}}},
+  },{responsive:true,displaylogo:false});
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ENRICHMENT CARDS
+// ══════════════════════════════════════════════════════════════════
+function buildEnrichmentView(){
+  if(!ENRICH) return;
+  const grid = document.getElementById('enrich-grid');
+  grid.innerHTML = '';
+
+  for(let j=0; j<DATA.n_clusters; j++){
+    const key  = String(j);
+    const data = ENRICH[key];
+    const card = document.createElement('div');
+    card.className = 'enrich-card';
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.className = 'enrich-card-hdr';
+    hdr.innerHTML =
+      `<div class="cl-dot" style="background:${clusterColor(j)};width:14px;height:14px"></div>
+       <h6>Cluster ${j}</h6>
+       <span class="sub">${DATA.cluster_sizes[j].toLocaleString()} genes</span>`;
+    card.appendChild(hdr);
+
+    if(!data || !data.top_descriptions || data.top_descriptions.length===0){
+      const p = document.createElement('div');
+      p.className='go-empty'; p.textContent='No enrichment data';
+      card.appendChild(p);
+    } else {
+      const samp = document.createElement('div');
+      samp.style.cssText='font-size:.68rem;color:var(--muted);margin-bottom:4px';
+      samp.textContent = `Sampled: ${data.sampled_size?.toLocaleString() ?? '–'} genes`;
+      card.appendChild(samp);
+
+      data.top_descriptions.forEach((d,rank)=>{
+        const pill = document.createElement('div');
+        pill.className = 'go-pill';
+        const sub2 = [d.secondary, d.tertiary].filter(x=>x&&x!=='-').join(' · ');
+        pill.innerHTML =
+          `<span><b>${rank+1}.</b> ${escHtml(d.primary||'–')}</span>` +
+          (sub2 ? `<span class="tier-2">${escHtml(sub2)}</span>` : '');
+        card.appendChild(pill);
+      });
+    }
+    grid.appendChild(card);
+  }
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ══════════════════════════════════════════════════════════════════
+//  GENE TABLE  (DataTables with proper column data API – fixes filter)
+// ══════════════════════════════════════════════════════════════════
+function buildTable(){
+  // Build plain data objects (NO HTML in data objects – render functions handle display)
+  const rows = DATA.genes.map((g,i)=>({
+    _idx:    i,
+    gene:    g[0],
+    ccds:    g[1],
+    chr:     g[2],
+    len:     g[3],
+    strand:  g[4],
+    cluster: g[5],   // raw integer
+  }));
 
   GENE_TABLE = $('#gene-table').DataTable({
-    pageLength:25,
-    deferRender:true,
-    order:[[0,'asc']],
-    language:{search:'Search genes:'},
-    columnDefs:[{targets:[2,3,4,5],searchable:false}],
+    data: rows,
+    pageLength: 25,
+    deferRender: true,
+    order: [[0,'asc']],
+    columns: [
+      { data:'gene',    render:(v,t)=> t==='display' ? `<b>${escHtml(v)}</b>` : v },
+      { data:'ccds',    render:(v)=>escHtml(v) },
+      { data:'chr' },
+      { data:'len',     render:(v,t)=> t==='display' ? v.toLocaleString() : v },
+      { data:'strand' },
+      {
+        data:'cluster',
+        render:(v,t)=>{
+          if(t!=='display') return v;  // raw int for sort/filter/search
+          const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;`+
+                      `background:${clusterColor(v)};margin-right:5px;vertical-align:middle"></span>`;
+          return dot + v;
+        },
+      },
+    ],
+    createdRow:(row,data)=>{ $(row).data('idx', data._idx); },
   });
 
-  // Row click → show in scatter + gene panel
+  // ── CUSTOM FILTER (uses raw rowData, not HTML) ──
+  $.fn.dataTable.ext.search = [];
+  $.fn.dataTable.ext.search.push((_settings, _data, _idx, rowData)=>{
+    const cl  = document.getElementById('f-cluster').value;
+    const chr = document.getElementById('f-chr').value;
+    const str = document.getElementById('f-strand').value;
+    if(cl  && rowData.cluster !== parseInt(cl))  return false;
+    if(chr && rowData.chr     !== chr)            return false;
+    if(str && rowData.strand  !== str)            return false;
+    return true;
+  });
+
+  // ── Row click ──
   $('#gene-table tbody').on('click','tr',function(){
-    const idx = parseInt($(this).data('idx'));
-    showGenePanel(idx);
-    // Switch to scatter tab
+    const idx = $(this).data('idx');
+    if(idx === undefined) return;
+    onGeneSelect(idx);
     document.querySelector('[data-tab="scatter"]').click();
-    // Highlight this gene in the plot
     highlightGeneInScatter(idx);
-    if(CODONS && document.getElementById('codon-modal')){
-      // also open modal for table-clicked genes
-    }
   });
 
   updateTableInfo();
-}
-
-function highlightGeneInScatter(geneIdx){
-  const g   = DATA.genes[geneIdx];
-  const pcX = parseInt(document.getElementById('x-axis').value);
-  const pcY = parseInt(document.getElementById('y-axis').value);
-  const x   = g[6+pcX];
-  const y   = g[6+pcY];
-
-  // Add a highlighted marker trace on top
-  const traceH = {
-    type:'scattergl', mode:'markers',
-    x:[x], y:[y],
-    marker:{symbol:'circle-open',size:18,color:'#ffffff',line:{width:2}},
-    showlegend:false, hoverinfo:'skip', name:'selected',
-  };
-  // Remove previous highlight trace if present
-  const gd = document.getElementById('scatter-plot');
-  const traces = gd.data || [];
-  const existH = traces.findIndex(t=>t.name==='selected');
-  if(existH>=0) Plotly.deleteTraces('scatter-plot', existH);
-  Plotly.addTraces('scatter-plot', traceH);
 }
 
 function populateTableFilters(){
-  // Chromosomes
+  // Clusters
+  const clSel = document.getElementById('f-cluster');
+  for(let j=0; j<DATA.n_clusters; j++){
+    clSel.innerHTML += `<option value="${j}">Cluster ${j} (${DATA.cluster_sizes[j].toLocaleString()})</option>`;
+  }
+  // Chromosomes (sorted numerically then alphabetically)
   const chrs = [...new Set(DATA.genes.map(g=>g[2]))].sort((a,b)=>{
-    const na=parseInt(a),nb=parseInt(b);
-    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
-    return a.localeCompare(b);
+    const na=parseInt(a), nb=parseInt(b);
+    return (!isNaN(na)&&!isNaN(nb)) ? na-nb : a.localeCompare(b);
   });
-  const chrSel = document.getElementById('tbl-chr-filter');
+  const chrSel = document.getElementById('f-chr');
   chrs.forEach(c=>{ chrSel.innerHTML += `<option value="${c}">${c}</option>`; });
 
-  // Wire up filters
-  ['tbl-cluster-filter','tbl-chr-filter','tbl-strand-filter'].forEach(id=>{
-    document.getElementById(id).addEventListener('change', applyTableFilters);
+  // Wire up filter dropdowns
+  ['f-cluster','f-chr','f-strand'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', ()=>{
+      GENE_TABLE.draw();
+      updateTableInfo();
+    });
   });
-}
-
-function applyTableFilters(){
-  const cl  = document.getElementById('tbl-cluster-filter').value;
-  const chr = document.getElementById('tbl-chr-filter').value;
-  const str = document.getElementById('tbl-strand-filter').value;
-
-  // DataTables custom filter
-  $.fn.dataTable.ext.search = [];
-  $.fn.dataTable.ext.search.push((_settings, data)=>{
-    // data[0]=gene [1]=ccds [2]=chr [3]=len [4]=strand [5]=cluster
-    const clText  = data[5].replace(/[^0-9]/g,'');   // extract cluster number
-    if(cl  && clText  !== cl)  return false;
-    if(chr && data[2] !== chr) return false;
-    if(str && data[4] !== str) return false;
-    return true;
-  });
-  GENE_TABLE.draw();
-  updateTableInfo();
 }
 
 function updateTableInfo(){
   if(!GENE_TABLE) return;
   const n = GENE_TABLE.rows({filter:'applied'}).count();
   document.getElementById('tbl-info').textContent =
-    `Showing ${n.toLocaleString()} of ${DATA.genes.length.toLocaleString()} genes`;
+    `${n.toLocaleString()} of ${DATA.genes.length.toLocaleString()} genes`;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Boot
-// ═══════════════════════════════════════════════════════════════════
-loadData().catch(err=>{
-  document.getElementById('loader-msg').textContent = '❌ Failed to load data.json – ' + err.message;
-  document.getElementById('loader-msg').style.color = '#f85149';
+function highlightGeneInScatter(idx){
+  const g  = DATA.genes[idx];
+  const xi = parseInt(document.getElementById('x-axis').value);
+  const yi = parseInt(document.getElementById('y-axis').value);
+  const gd = document.getElementById('scatter-plot');
+  const existing = (gd.data||[]).findIndex(t=>t.name==='_selected');
+  if(existing>=0) Plotly.deleteTraces('scatter-plot', existing);
+  Plotly.addTraces('scatter-plot',{
+    type:'scattergl', mode:'markers', name:'_selected',
+    x:[g[6+xi]], y:[g[6+yi]], hoverinfo:'skip',
+    marker:{symbol:'circle-open',size:20,color:'#CCBB44',line:{width:2}},
+    showlegend:false,
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DOWNLOAD CSV
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('dl-csv').addEventListener('click', ()=>{
+  if(!GENE_TABLE) return;
+  const rows = GENE_TABLE.rows({filter:'applied'}).data().toArray();
+
+  const codonHeaders = DATA.codon_cols.join(',');
+  let csv = `gene,ccds_id,chr,length_nt,strand,cluster,pc1,pc2,pc3${CODONS?','+codonHeaders:''}\n`;
+
+  rows.forEach(r=>{
+    const g = DATA.genes[r._idx];
+    let line = [r.gene,r.ccds,r.chr,r.len,r.strand,r.cluster,g[6],g[7],g[8]].join(',');
+    if(CODONS) line += ',' + CODONS[r._idx].join(',');
+    csv += line + '\n';
+  });
+
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'codon_usage_filtered.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════════════
+main().catch(err=>{
+  document.getElementById('loader-msg').textContent = '❌ ' + err.message;
+  document.getElementById('loader-msg').style.color = '#EE6677';
   console.error(err);
 });
 </script>
